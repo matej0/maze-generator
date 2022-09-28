@@ -18,6 +18,7 @@ using ulong_t = unsigned long;
 #include <cctype>
 #include <string>
 #include <chrono>
+#include <random>
 #include <thread>
 #include <memory>
 #include <sstream>

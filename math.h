@@ -24,4 +24,6 @@ namespace math {
 	__forceinline void clamp(t& n, const t& lower, const t& upper) {
 		n = std::max(lower, std::min(n, upper));
 	}
+
+
 };

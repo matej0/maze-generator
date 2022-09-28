@@ -9,7 +9,7 @@ Cell::Cell( int x, int y ) {
 	top->setPosition( { static_cast< float >( x ) * cell_size, static_cast< float >( y ) * cell_size } );
 	top->setFillColor( sf::Color::White );
 
-	m_vertices.push_back( top );
+	m_vertices.push_back( { top, true } );
 
 	sf::RectangleShape* right = new sf::RectangleShape( );
 
@@ -17,7 +17,7 @@ Cell::Cell( int x, int y ) {
 	right->setPosition( { (static_cast< float >( x ) * cell_size) + cell_size, static_cast< float >( y ) * cell_size } );
 	right->setFillColor( sf::Color::White );
 
-	m_vertices.push_back( right );
+	m_vertices.push_back( { right, true } );
 
 	sf::RectangleShape* bottom = new sf::RectangleShape( );
 
@@ -25,7 +25,7 @@ Cell::Cell( int x, int y ) {
 	bottom->setPosition( { static_cast< float >( x ) * cell_size, (static_cast< float >( y ) * cell_size) + cell_size } );
 	bottom->setFillColor( sf::Color::White );
 
-	m_vertices.push_back( bottom );
+	m_vertices.push_back( { bottom, true } );
 
 	sf::RectangleShape* left = new sf::RectangleShape( );
 
@@ -33,17 +33,14 @@ Cell::Cell( int x, int y ) {
 	left->setPosition( { static_cast< float >( x ) * cell_size , static_cast< float >( y ) * cell_size } );
 	left->setFillColor( sf::Color::White );
 
-	m_vertices.push_back( left );
+	m_vertices.push_back( { left, true } );
 }
 
 void Cell::RemoveWall( int wall ) {
 	if( !this || this->m_vertices.empty( ) )
 		return;
 
-	// instead of deleting this vertice, just null the pointer out since we might for whatever reason try do add it back.
-	// not to mention how then the walls would shift.
-	//this->m_vertices.emplace( this->m_vertices.begin( ) + wall, new sf::RectangleShape( ) );
-	this->m_vertices.clear( );
+	this->m_vertices[ wall ].m_should_draw = false;
 }
 
 void Maze::CreateCells( ) {
@@ -98,22 +95,22 @@ void Maze::FindNeighboringCells( ) {
 		int row = it->m_index_row;
 		int idx = it->m_index;
 
-		Cell* down = m_grid[ row + 1 ][ col ];
-		Cell* up = m_grid[ row - 1 ][ col ];
+		Cell* down  = m_grid[ row + 1 ][ col ];
+		Cell* up	= m_grid[ row - 1 ][ col ];
 		Cell* right = m_grid[ row ][ col + 1 ];
-		Cell* left = m_grid[ row ][ col - 1 ];
+		Cell* left	= m_grid[ row ][ col - 1 ];
 
-		if( down && ( row + 1 ) < api::m_rows )
-			m_neighbors[ idx ].push_back( down );
-
-		if( up && ( row - 1 ) >= 0 )
-			m_neighbors[ idx ].push_back( up );
-
+		if( up && ( row - 1 ) >= 0 ) 
+			m_neighbors[ idx ].push_back( { up, TOP } );
+		
 		if( right && ( col + 1 ) < api::m_columns )
-			m_neighbors[ idx ].push_back( right );
+			m_neighbors[ idx ].push_back( { right, RIGHT } );
 
+		if( down && ( row + 1 ) < api::m_rows ) 
+			m_neighbors[ idx ].push_back( { down, BOTTOM } );
+		
 		if( left && ( col - 1 ) >= 0 )
-			m_neighbors[ idx ].push_back( left );
+			m_neighbors[ idx ].push_back( { left, LEFT } );
 	}
 }
 
@@ -125,25 +122,99 @@ void Maze::ColorNeighbors( ) {
 		return;
 
 	for( int i = 0; i < m_neighbors[ index ].size( ); i++ ) {
-		Cell* neighbor = m_neighbors[ index ].at( i );
+		Cell* neighbor = m_neighbors[ index ].at( i ).neighbor_cell;
 
 
 		for( auto it : neighbor->m_vertices )
-			it->setFillColor( sf::Color::Red );
+			it.self->setFillColor( sf::Color::Red );
+	}
+}
+
+// walls overlap so we need to remove both.
+void Maze::RemoveWalls( Cell* one, Cell* two ) {
+
+	// figure out which wall to remove based on where the cell is in relation to first cell.
+	// if all neighbors exist then they go in the same order as walls.
+
+	for( auto it : m_neighbors[ one->m_index ] ) {
+
+		// if the 2nd cell is indeed one of our neighbors, remove the wall between us.
+		if( it.neighbor_cell == two ) {
+			if( it.side == RIGHT ) {
+				one->RemoveWall( RIGHT );
+				it.neighbor_cell->RemoveWall( LEFT );
+				break;
+			}
+
+			else if( it.side == LEFT ) {
+				one->RemoveWall( LEFT );
+				it.neighbor_cell->RemoveWall( RIGHT );
+				break;
+			}
+
+			else if( it.side == TOP ) {
+				one->RemoveWall( TOP );
+				it.neighbor_cell->RemoveWall( BOTTOM );
+				break;
+			}
+
+			else if( it.side == BOTTOM ) {
+				one->RemoveWall( BOTTOM );
+				it.neighbor_cell->RemoveWall( TOP );
+				break;
+			}
+		}	
+	}
+}
+
+void Maze::ColorVisitedCells( ) {
+	for( auto it : m_cells ) {
+		if( !it )
+			continue;
+
+		if( it->m_visited ) {
+			for( auto it : it->m_vertices )
+				it.self->setFillColor( sf::Color::Magenta );
+		}
+	}
+}
+
+void Maze::Think(  ) {
+	
+	if( m_current_cell ) {
+
+		for( auto it : m_neighbors[ m_current_cell->m_index ] ) {
+			if( !it.neighbor_cell->m_visited )
+				stack.push_back( m_current_cell );
+		}
+
+		int num_neighbors = m_neighbors[ m_current_cell->m_index ].size( ) - 1;
+
+		
+		Cell* next_cell = m_neighbors[ m_current_cell->m_index ].at( api::random_int( 0, num_neighbors ) ).neighbor_cell;
+
+		if( next_cell && !next_cell->m_visited ) {
+
+			this->RemoveWalls( m_current_cell, next_cell );
+			next_cell->m_visited = true;
+			m_current_cell = next_cell;
+		}
+		else if( stack.size( ) > 0 ) {
+			m_current_cell = stack.back( );
+			stack.pop_back( );
+		}
+
 	}
 }
 
 void Maze::Run( ) {
 
-	FindNeighboringCells( );
-	DrawCells( );
-	//ColorNeighbors( );
-
+	this->Think( );
+	this->DrawCells( );
 }
 
 void Maze::DrawCells( ) {
 
-	m_grid[ 1 ][ 4 ]->RemoveWall( 2 );
 
 	for( int i = 0; i < m_cells.size( ); i++ ) {
 		Cell* it = m_cells[ i ];
@@ -153,6 +224,16 @@ void Maze::DrawCells( ) {
 
 		it->DrawSelf( );
 	}
+}
 
-	m_grid[ 5 ][ 0 ]->RemoveWall( 2 );
+void Maze::Initialize( ) {
+
+	// call functions that need to be only called once.
+	this->CreateCells( );
+	this->IndexCells( );
+	this->FindNeighboringCells( );
+
+	this->m_initial_cell = m_grid[ 0 ][ 0 ];
+	m_initial_cell->m_visited = true;
+	m_current_cell = m_initial_cell;
 }

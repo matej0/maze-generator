@@ -17,9 +17,10 @@ int main( )
 	api::m_columns = std::floor( api::m_window_size_y / cell_size );
 
 	Maze myMaze;
-	myMaze.CreateCells( );
-	myMaze.IndexCells( );
+	myMaze.Initialize( );
+
 	
+
 	while( window.isOpen( ) )
 	{
 		sf::Event event;
