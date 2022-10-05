@@ -184,14 +184,15 @@ void Maze::Think(  ) {
 	if( m_current_cell ) {
 
 		for( auto it : m_neighbors[ m_current_cell->m_index ] ) {
-			if( !it.neighbor_cell->m_visited )
+			if( !it.neighbor_cell->m_visited ) {
 				stack.push_back( m_current_cell );
+				break;
+			}
 		}
 
-		int num_neighbors = m_neighbors[ m_current_cell->m_index ].size( ) - 1;
+		int neighbors = m_neighbors[ m_current_cell->m_index ].size( ) - 1;
 
-		
-		Cell* next_cell = m_neighbors[ m_current_cell->m_index ].at( api::random_int( 0, num_neighbors ) ).neighbor_cell;
+		Cell* next_cell = m_neighbors[ m_current_cell->m_index ].at( api::random_int( 0, neighbors ) ).neighbor_cell;
 
 		if( next_cell && !next_cell->m_visited ) {
 
@@ -203,7 +204,6 @@ void Maze::Think(  ) {
 			m_current_cell = stack.back( );
 			stack.pop_back( );
 		}
-
 	}
 }
 
@@ -214,7 +214,6 @@ void Maze::Run( ) {
 }
 
 void Maze::DrawCells( ) {
-
 
 	for( int i = 0; i < m_cells.size( ); i++ ) {
 		Cell* it = m_cells[ i ];
